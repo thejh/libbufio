@@ -22,6 +22,13 @@ static void connection_waiting_cb(struct ev_loop *loop, ev_io *w, int revents) {
     assert(res != 0);
     con->inbuf_used += res;
     if (con->inbuf_size == con->inbuf_used) {
+      // The buffer is filled, so stop reading data until we have a new one.
+      ev_io_stop(loop, w);
+      ev_io_set(w, w->fd, w->events&~EV_READ);
+      ev_io_start(loop, w);
+
+      // Call the callback AFTERWARDS (after it has finished executing, we might
+      // already have a new read buffer).
       con->data_cb(con);
     }
   }
@@ -29,7 +36,7 @@ static void connection_waiting_cb(struct ev_loop *loop, ev_io *w, int revents) {
   if (revents & EV_WRITE) {
     if (bufio_chain_flush(&con->outbuf, w->fd) == 0) {
       ev_io_stop(loop, w);
-      ev_io_set(w, w->fd, EV_READ);
+      ev_io_set(w, w->fd, w->events&~EV_WRITE);
       ev_io_start(loop, w);
     }
   }
@@ -39,7 +46,7 @@ bufio_connection *bufio_connection_create(struct ev_loop *loop, int fd) {
   bufio_connection *con = calloc(1, sizeof(*con));
   if (con == NULL) return NULL;
   con->loop = loop;
-  ev_io_init(&con->w, connection_waiting_cb, fd, EV_READ);
+  ev_io_init(&con->w, connection_waiting_cb, fd, 0);
   ev_io_start(loop, &con->w);
   return con;
 }
@@ -49,6 +56,12 @@ void bufio_connection_set_read_buffer(bufio_connection *con, void *buf, size_t s
   con->inbuf = buf;
   con->inbuf_size = size;
   con->inbuf_used = 0;
+
+  if ((con->w.events & EV_READ) == 0) {
+    ev_io_stop(con->loop, &con->w);
+    ev_io_set(&con->w, con->w.fd, con->w.events|EV_READ);
+    ev_io_start(con->loop, &con->w);
+  }
 }
 
 void bufio_connection_destroy(bufio_connection *con) {
@@ -65,7 +78,8 @@ int bufio_connection_write(bufio_connection *con, void *buf, size_t len) {
   if (chain_was_empty) {
     if (bufio_chain_flush(&con->outbuf, con->w.fd)) {
       ev_io_stop(con->loop, &con->w);
-      ev_io_set(&con->w, con->w.fd, EV_READ|EV_WRITE);
+      ev_io_set(&con->w, con->w.fd, con->w.events|EV_WRITE);
+      ev_io_start(con->loop, &con->w);
     }
   }
   return 0;

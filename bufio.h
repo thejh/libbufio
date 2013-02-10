@@ -59,9 +59,9 @@ struct bufio_connection {
   bufio_connection_error_cb_t err_cb;
 
   /**
-   * Called when your read buffer has been filled completely. You have to
-   * provide a new one immediately. This property can be changed manually
-   * at any time.
+   * Called when your read buffer has been filled completely. When this is
+   * called, nothing will be read anymore until you set a new read buffer.
+   * This property can be changed manually at any time.
    */
   bufio_connection_data_cb_t data_cb;
 
