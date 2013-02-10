@@ -45,7 +45,8 @@ typedef void (*bufio_connection_error_cb_t)(bufio_connection *con);
 typedef void (*bufio_connection_data_cb_t)(bufio_connection *con);
 
 struct bufio_connection {
-  ev_io w; /* readonly */
+  ev_io rw; /* readonly */
+  ev_io ww; /* readonly */
   struct ev_loop *loop; /* readonly */
   void *inbuf; /* readonly */
   size_t inbuf_size; /* readonly */
