@@ -19,7 +19,10 @@ static void connection_waiting_cb(struct ev_loop *loop, ev_io *w, int revents) {
       }
       return;
     }
-    assert(res != 0);
+    if (res == 0) {
+      con->err_cb(con);
+      return;
+    }
     con->inbuf_used += res;
     if (con->inbuf_size == con->inbuf_used) {
       // The buffer is filled, so stop reading data until we have a new one.
